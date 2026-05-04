@@ -1,12 +1,11 @@
-// Phase 0 spike — answer one question:
-//   "Does Cloudflare Workers' egress complete a WebSocket handshake to ws.ptt.cc?"
+// Routes:
+//   GET /spike                        — Phase 0 connectivity probe (no login)
+//   GET /test-login?u=<id>&p=<pwd>    — Phase 1 end-to-end login probe
 //
-// No login. No credentials. Just open the WS, capture the BBS welcome banner
-// (the first few seconds of frames), Big5-decode it, and return a JSON report.
-//
-// Deploy:   npx wrangler deploy
-// Test:     curl https://ptt-autosign-worker.<your-subdomain>.workers.dev/spike
-//   or:     npm run dev   then   curl http://localhost:8787/spike
+// Both endpoints are dev-only. Phase 1.6 replaces /test-login with a
+// scheduled() cron handler that loops over PTT_ACCOUNTS and notifies Telegram.
+
+import { PttBot } from "./ptt";
 
 const PTT_WS_URL = "https://ws.ptt.cc/bbs/";
 const PTT_ORIGIN = "https://term.ptt.cc";
@@ -27,18 +26,52 @@ type SpikeReport = {
 export default {
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
-    if (url.pathname !== "/spike") {
-      return new Response(
-        "GET /spike — opens a WebSocket to ws.ptt.cc and reports the handshake + first frames",
-        { status: 404 },
-      );
+    if (url.pathname === "/spike") {
+      const report = await runSpike();
+      return json(report);
     }
-    const report = await runSpike();
-    return new Response(JSON.stringify(report, null, 2), {
-      headers: { "content-type": "application/json; charset=utf-8" },
-    });
+    if (url.pathname === "/test-login") {
+      const u = url.searchParams.get("u") ?? "";
+      const p = url.searchParams.get("p") ?? "";
+      if (!u || !p) {
+        return new Response("Missing ?u=<id>&p=<password>", { status: 400 });
+      }
+      const result = await runTestLogin(u, p);
+      return json(result);
+    }
+    return new Response(
+      "Routes:\n  GET /spike\n  GET /test-login?u=<id>&p=<password>\n",
+      { status: 404 },
+    );
   },
 } satisfies ExportedHandler;
+
+function json(body: unknown): Response {
+  return new Response(JSON.stringify(body, null, 2), {
+    headers: { "content-type": "application/json; charset=utf-8" },
+  });
+}
+
+async function runTestLogin(username: string, password: string) {
+  const bot = new PttBot();
+  try {
+    await bot.connect();
+    const result = await bot.login(username, password, true);
+    if (result.ok) {
+      await bot.logout();
+    }
+    return result;
+  } catch (e) {
+    return {
+      ok: false,
+      reason: `exception: ${(e as Error).message}`,
+      screen: bot.dumpScreen().slice(-2000),
+      elapsed_ms: 0,
+    };
+  } finally {
+    bot.close();
+  }
+}
 
 async function runSpike(): Promise<SpikeReport> {
   const start = Date.now();
@@ -144,7 +177,7 @@ async function runSpike(): Promise<SpikeReport> {
         off += f.byteLength;
       }
       try {
-        report.decoded = new TextDecoder("big5", { fatal: false })
+        report.decoded = new TextDecoder("big5", { fatal: false, ignoreBOM: true })
           .decode(all)
           .slice(0, 1200);
       } catch (e) {
