@@ -17,7 +17,10 @@ export interface Env {
 const PTT_WS_URL = "https://ws.ptt.cc/bbs/";
 const PTT_ORIGIN = "https://term.ptt.cc";
 const CAPTURE_MS = 5000;
-const INTER_ACCOUNT_DELAY_MS = 2000;
+// Tuned for Cloudflare Workers Free plan: a single scheduled() invocation
+// has ~30s wall-clock. Per account: ~10–17s realistic, ~22s worst case.
+// Two accounts fit (10+1+10 ≈ 21s); 3+ accounts may need Paid plan.
+const INTER_ACCOUNT_DELAY_MS = 1000;
 
 type SignInResult = {
   id: string;

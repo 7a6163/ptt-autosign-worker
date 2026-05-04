@@ -86,6 +86,11 @@ Failure:
   login itself succeeds, the Telegram message just omits those lines.
 - **Cron precision** — Cloudflare crons fire within seconds of `02:30 UTC`.
   Add jitter inside `scheduled()` if anti-detection becomes a concern.
+- **Free-plan budget** — Timeouts are tuned for a 30-second Free-plan
+  scheduled-handler wall-clock. Per account budget: ~10–17 s realistic,
+  ~22 s worst case. **Two accounts fit; 3+ accounts likely need the
+  Paid plan.** Knobs to adjust in `src/ptt.ts`: the `15_000`-ms login
+  deadline and the inner `getUser` waitFor timeouts.
 
 ## File layout
 

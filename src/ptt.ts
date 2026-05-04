@@ -233,7 +233,10 @@ export class PttBot {
     this.sock.send(`${username},${KEY_ENTER}${password}${KEY_ENTER}`);
 
     const seen = { kick: false, tooOften: false, cleanup: false, anyKey: false };
-    const deadline = Date.now() + 30_000;
+    // 15s budget keeps the per-account worst-case under the Cloudflare Free
+    // plan's 30s scheduled-handler wall-clock. PTT login normally completes
+    // in 2–7s; padding above that is just dead clock.
+    const deadline = Date.now() + 15_000;
 
     while (Date.now() < deadline) {
       const buf = this.sock.screen;
@@ -310,7 +313,7 @@ export class PttBot {
     this.sock.send(`T${KEY_ENTER}`);
     const talkOk = await this.sock.waitFor(
       (b) => b.includes("查詢網友") || b.includes("(Q)") || b.includes("休閒聊天"),
-      4_000,
+      2_000,
     );
     if (!talkOk) return empty;
 
@@ -320,7 +323,7 @@ export class PttBot {
       // Don't fall back to bare `代號` — the rolling buffer still holds the
       // initial login prompt `請輸入代號…`, which would match instantly.
       (b) => b.includes("請輸入使用者代號"),
-      3_000,
+      2_000,
     );
     if (!queryPromptOk) {
       await this.escapeToMain();
@@ -329,7 +332,7 @@ export class PttBot {
 
     // Submit target id and let the info screen render.
     this.sock.send(`${targetId}${KEY_ENTER}`);
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, 800));
 
     const buf = this.sock.utf8View;
     const loginMatch = buf.match(/登入次數》\s*(\d+)/);
@@ -361,7 +364,7 @@ export class PttBot {
   async logout(): Promise<void> {
     if (!this.loggedIn) return;
     this.sock.send(`G${KEY_ENTER}Y${KEY_ENTER}`);
-    await new Promise((r) => setTimeout(r, 800));
+    await new Promise((r) => setTimeout(r, 500));
     this.sock.send(KEY_ENTER);
     this.loggedIn = false;
   }
