@@ -75,19 +75,43 @@ async function runSpike(): Promise<SpikeReport> {
     }
 
     const ws = resp.webSocket;
+    // Prefer ArrayBuffer over Blob so the message handler stays sync.
+    // Workers may ignore this on some compat dates; we fall back to Blob below.
+    try {
+      (ws as unknown as { binaryType: string }).binaryType = "arraybuffer";
+    } catch {
+      /* runtime doesn't support setter — handle Blob in listener */
+    }
     ws.accept();
 
     const frames: Uint8Array[] = [];
+    const pending: Promise<void>[] = [];
     await new Promise<void>((resolve) => {
       const finish = () => resolve();
       ws.addEventListener("message", (e: MessageEvent) => {
-        const buf =
-          e.data instanceof ArrayBuffer
-            ? new Uint8Array(e.data)
-            : new TextEncoder().encode(String(e.data));
-        frames.push(buf);
-        report.frameCount++;
-        report.totalBytes += buf.byteLength;
+        const data = e.data;
+        if (data instanceof ArrayBuffer) {
+          const buf = new Uint8Array(data);
+          frames.push(buf);
+          report.frameCount++;
+          report.totalBytes += buf.byteLength;
+        } else if (typeof Blob !== "undefined" && data instanceof Blob) {
+          pending.push(
+            (async () => {
+              const buf = new Uint8Array(await data.arrayBuffer());
+              frames.push(buf);
+              report.frameCount++;
+              report.totalBytes += buf.byteLength;
+            })(),
+          );
+        } else if (typeof data === "string") {
+          const buf = new TextEncoder().encode(data);
+          frames.push(buf);
+          report.frameCount++;
+          report.totalBytes += buf.byteLength;
+        } else {
+          report.error = `unexpected frame type: ${Object.prototype.toString.call(data)}`;
+        }
       });
       ws.addEventListener("close", finish);
       ws.addEventListener("error", finish);
@@ -100,6 +124,11 @@ async function runSpike(): Promise<SpikeReport> {
         finish();
       }, CAPTURE_MS);
     });
+
+    // Drain any in-flight Blob -> ArrayBuffer reads before snapshotting.
+    if (pending.length > 0) {
+      await Promise.allSettled(pending);
+    }
 
     if (frames.length > 0) {
       const first = frames[0];
