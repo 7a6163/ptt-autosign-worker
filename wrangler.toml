@@ -2,12 +2,13 @@ name = "ptt-autosign-worker"
 main = "src/index.ts"
 compatibility_date = "2026-05-01"
 
-# Phase 0 spike: HTTP-only. No cron yet — we deploy and curl /spike to verify
-# Workers' egress can complete a WebSocket handshake to ws.ptt.cc.
-# When/if Phase 0 is green, add:
-#   [triggers]
-#   crons = ["30 2 * * *"]
-# and set secrets via:
+# Daily sign-in at 02:30 UTC (~10:30 Taipei). Matches the original
+# trigger_layerci.yml schedule from the Python project.
+[triggers]
+crons = ["30 2 * * *"]
+
+# Required secrets — set via:
 #   wrangler secret put TELEGRAM_BOT_TOKEN
 #   wrangler secret put TELEGRAM_CHAT_ID
-#   wrangler secret put PTT_ACCOUNTS   (JSON array of {id, password})
+#   wrangler secret put PTT_ACCOUNTS    # JSON: [{"id":"alice","password":"..."}]
+#   wrangler secret put RUN_TOKEN       # gates the manual /run endpoint

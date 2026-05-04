@@ -21,6 +21,12 @@ export type LoginResult =
   | { ok: true; screen: string; elapsed_ms: number }
   | { ok: false; reason: string; screen: string; elapsed_ms: number };
 
+export type UserInfo = {
+  loginCount: number | null;
+  mailStatus: string | null;
+  rawScreen: string;
+};
+
 export function stripAnsi(s: string): string {
   return s.replace(ANSI_RE, "").replace(HTTP_NOISE_RE, "");
 }
@@ -277,6 +283,64 @@ export class PttBot {
     return (
       "[BIG5]\n" + this.sock.big5View + "\n[UTF-8]\n" + this.sock.utf8View
     );
+  }
+
+  /**
+   * Best-effort user-info query: T → Q → targetId → parse → escape back.
+   * Returns null fields when the regex fails so sign-in reporting can degrade
+   * gracefully. PyPtt-equivalent: ptt.get_user(target_id).
+   */
+  async getUser(targetId: string): Promise<UserInfo> {
+    const empty: UserInfo = {
+      loginCount: null,
+      mailStatus: null,
+      rawScreen: "",
+    };
+    if (!this.loggedIn) return empty;
+
+    // Navigate: main menu → talk menu.
+    this.sock.send(`T${KEY_ENTER}`);
+    const talkOk = await this.sock.waitFor(
+      (b) => b.includes("查詢網友") || b.includes("(Q)") || b.includes("休閒聊天"),
+      4_000,
+    );
+    if (!talkOk) return empty;
+
+    // Talk menu → user query.
+    this.sock.send(`Q${KEY_ENTER}`);
+    const queryPromptOk = await this.sock.waitFor(
+      (b) => b.includes("請輸入使用者代號") || b.includes("代號"),
+      3_000,
+    );
+    if (!queryPromptOk) {
+      await this.escapeToMain();
+      return empty;
+    }
+
+    // Submit target id and let the info screen render.
+    this.sock.send(`${targetId}${KEY_ENTER}`);
+    await new Promise((r) => setTimeout(r, 1500));
+
+    const buf = this.sock.utf8View;
+    const loginMatch = buf.match(/登入次數》\s*(\d+)/);
+    const mailMatch = buf.match(/信箱[^》]*》\s*([^\r\n《]+?)\s{2,}/);
+
+    const info: UserInfo = {
+      loginCount: loginMatch ? parseInt(loginMatch[1], 10) : null,
+      mailStatus: mailMatch ? mailMatch[1].trim() : null,
+      rawScreen: buf.slice(-1500),
+    };
+
+    await this.escapeToMain();
+    return info;
+  }
+
+  /** Press q a few times to drop back to main menu. Best-effort. */
+  private async escapeToMain(): Promise<void> {
+    for (let i = 0; i < 3; i++) {
+      this.sock.send(`q${KEY_ENTER}`);
+      await new Promise((r) => setTimeout(r, 250));
+    }
   }
 
   async logout(): Promise<void> {

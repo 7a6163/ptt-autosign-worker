@@ -1,15 +1,33 @@
-// Routes:
-//   GET /spike                        — Phase 0 connectivity probe (no login)
-//   GET /test-login?u=<id>&p=<pwd>    — Phase 1 end-to-end login probe
-//
-// Both endpoints are dev-only. Phase 1.6 replaces /test-login with a
-// scheduled() cron handler that loops over PTT_ACCOUNTS and notifies Telegram.
+// Entrypoints:
+//   scheduled() — invoked by Cron Trigger; runs sign-in for every account in PTT_ACCOUNTS.
+//   GET /run?secret=<RUN_TOKEN> — manual cron-equivalent trigger for testing.
+//   GET /test-login?u=<id>&p=<pwd> — single-account login probe (dev-only).
+//   GET /spike — Phase 0 connectivity probe (no login).
 
 import { PttBot } from "./ptt";
+import type { UserInfo } from "./ptt";
+import { sendTelegram } from "./telegram";
+
+export interface Env {
+  TELEGRAM_BOT_TOKEN: string;
+  TELEGRAM_CHAT_ID: string;
+  PTT_ACCOUNTS: string; // JSON: [{"id":"alice","password":"..."}, ...]
+  RUN_TOKEN: string; // gate for /run
+}
 
 const PTT_WS_URL = "https://ws.ptt.cc/bbs/";
 const PTT_ORIGIN = "https://term.ptt.cc";
 const CAPTURE_MS = 5000;
+const INTER_ACCOUNT_DELAY_MS = 2000;
+
+type SignInResult = {
+  id: string;
+  ok: boolean;
+  reason?: string;
+  loginCount: number | null;
+  mailStatus: string | null;
+  elapsed_ms: number;
+};
 
 type SpikeReport = {
   url: string;
@@ -24,27 +42,171 @@ type SpikeReport = {
 };
 
 export default {
-  async fetch(req: Request): Promise<Response> {
+  async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
+
     if (url.pathname === "/spike") {
-      const report = await runSpike();
-      return json(report);
+      return json(await runSpike());
     }
+
     if (url.pathname === "/test-login") {
       const u = url.searchParams.get("u") ?? "";
       const p = url.searchParams.get("p") ?? "";
       if (!u || !p) {
         return new Response("Missing ?u=<id>&p=<password>", { status: 400 });
       }
-      const result = await runTestLogin(u, p);
-      return json(result);
+      return json(await runTestLogin(u, p));
     }
+
+    if (url.pathname === "/run") {
+      const secret = url.searchParams.get("secret") ?? "";
+      if (!env.RUN_TOKEN || secret !== env.RUN_TOKEN) {
+        return new Response("forbidden", { status: 403 });
+      }
+      return json(await runDailySignIn(env));
+    }
+
     return new Response(
-      "Routes:\n  GET /spike\n  GET /test-login?u=<id>&p=<password>\n",
+      "Routes:\n  GET /spike\n  GET /test-login?u=&p=\n  GET /run?secret=\n",
       { status: 404 },
     );
   },
-} satisfies ExportedHandler;
+
+  async scheduled(_ctrl: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(runDailySignIn(env).then((r) => {
+      console.log("daily sign-in summary:", JSON.stringify(r));
+    }));
+  },
+} satisfies ExportedHandler<Env>;
+
+// ---------- daily sign-in ----------
+
+async function runDailySignIn(env: Env): Promise<{
+  accounts: SignInResult[];
+  errors: string[];
+}> {
+  const accounts = parseAccounts(env.PTT_ACCOUNTS);
+  const errors: string[] = [];
+  const results: SignInResult[] = [];
+
+  if (accounts.length === 0) {
+    errors.push("PTT_ACCOUNTS is empty or malformed");
+    return { accounts: [], errors };
+  }
+
+  for (let i = 0; i < accounts.length; i++) {
+    const acc = accounts[i];
+    const result = await signInOne(acc.id, acc.password);
+    results.push(result);
+    console.log(
+      `[${acc.id}] ok=${result.ok} reason=${result.reason ?? "-"} elapsed=${result.elapsed_ms}ms`,
+    );
+
+    try {
+      await sendTelegram(
+        env.TELEGRAM_BOT_TOKEN,
+        env.TELEGRAM_CHAT_ID,
+        formatMessage(result),
+      );
+    } catch (e) {
+      const msg = `telegram send failed for ${acc.id}: ${(e as Error).message}`;
+      console.warn(msg);
+      errors.push(msg);
+    }
+
+    if (i < accounts.length - 1) {
+      await new Promise((r) => setTimeout(r, INTER_ACCOUNT_DELAY_MS));
+    }
+  }
+
+  return { accounts: results, errors };
+}
+
+async function signInOne(id: string, password: string): Promise<SignInResult> {
+  const bot = new PttBot();
+  try {
+    await bot.connect();
+    const login = await bot.login(id, password, true);
+    if (!login.ok) {
+      return {
+        id,
+        ok: false,
+        reason: login.reason,
+        loginCount: null,
+        mailStatus: null,
+        elapsed_ms: login.elapsed_ms,
+      };
+    }
+
+    let info: UserInfo = { loginCount: null, mailStatus: null, rawScreen: "" };
+    try {
+      info = await bot.getUser(id);
+    } catch (e) {
+      console.warn(`getUser failed for ${id}: ${(e as Error).message}`);
+    }
+
+    try {
+      await bot.logout();
+    } catch (e) {
+      console.warn(`logout failed for ${id}: ${(e as Error).message}`);
+    }
+
+    return {
+      id,
+      ok: true,
+      loginCount: info.loginCount,
+      mailStatus: info.mailStatus,
+      elapsed_ms: login.elapsed_ms,
+    };
+  } catch (e) {
+    return {
+      id,
+      ok: false,
+      reason: `exception: ${(e as Error).message}`,
+      loginCount: null,
+      mailStatus: null,
+      elapsed_ms: 0,
+    };
+  } finally {
+    bot.close();
+  }
+}
+
+function formatMessage(r: SignInResult): string {
+  const date = new Date()
+    .toISOString()
+    .slice(0, 10)
+    .replace(/-/g, "");
+  if (r.ok) {
+    let msg = `✅ PTT ${htmlEscape(r.id)} 已成功簽到\n`;
+    if (r.loginCount !== null) msg += `📆 已登入 ${r.loginCount} 天\n`;
+    if (r.mailStatus) msg += `📫 ${htmlEscape(r.mailStatus)}\n`;
+    msg += `#ptt #${date}`;
+    return msg;
+  }
+  return `❌ PTT ${htmlEscape(r.id)} 簽到失敗\n原因：${htmlEscape(r.reason ?? "unknown")}\n#ptt #${date}`;
+}
+
+function parseAccounts(raw: string | undefined): Array<{ id: string; password: string }> {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (a): a is { id: string; password: string } =>
+        a && typeof a.id === "string" && typeof a.password === "string" && a.id.length > 0,
+    );
+  } catch {
+    return [];
+  }
+}
+
+function htmlEscape(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
 function json(body: unknown): Response {
   return new Response(JSON.stringify(body, null, 2), {
@@ -52,13 +214,17 @@ function json(body: unknown): Response {
   });
 }
 
+// ---------- dev probes ----------
+
 async function runTestLogin(username: string, password: string) {
   const bot = new PttBot();
   try {
     await bot.connect();
     const result = await bot.login(username, password, true);
     if (result.ok) {
+      const info = await bot.getUser(username).catch(() => null);
       await bot.logout();
+      return { ...result, userInfo: info };
     }
     return result;
   } catch (e) {
@@ -89,10 +255,7 @@ async function runSpike(): Promise<SpikeReport> {
 
   try {
     const resp = await fetch(PTT_WS_URL, {
-      headers: {
-        Upgrade: "websocket",
-        Origin: PTT_ORIGIN,
-      },
+      headers: { Upgrade: "websocket", Origin: PTT_ORIGIN },
     });
 
     report.handshake = {
@@ -108,12 +271,10 @@ async function runSpike(): Promise<SpikeReport> {
     }
 
     const ws = resp.webSocket;
-    // Prefer ArrayBuffer over Blob so the message handler stays sync.
-    // Workers may ignore this on some compat dates; we fall back to Blob below.
     try {
       (ws as unknown as { binaryType: string }).binaryType = "arraybuffer";
     } catch {
-      /* runtime doesn't support setter — handle Blob in listener */
+      /* fall through to Blob branch */
     }
     ws.accept();
 
@@ -158,7 +319,6 @@ async function runSpike(): Promise<SpikeReport> {
       }, CAPTURE_MS);
     });
 
-    // Drain any in-flight Blob -> ArrayBuffer reads before snapshotting.
     if (pending.length > 0) {
       await Promise.allSettled(pending);
     }
