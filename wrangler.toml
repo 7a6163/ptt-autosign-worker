@@ -1,0 +1,13 @@
+name = "ptt-autosign-worker"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+
+# Phase 0 spike: HTTP-only. No cron yet — we deploy and curl /spike to verify
+# Workers' egress can complete a WebSocket handshake to ws.ptt.cc.
+# When/if Phase 0 is green, add:
+#   [triggers]
+#   crons = ["30 2 * * *"]
+# and set secrets via:
+#   wrangler secret put TELEGRAM_BOT_TOKEN
+#   wrangler secret put TELEGRAM_CHAT_ID
+#   wrangler secret put PTT_ACCOUNTS   (JSON array of {id, password})
