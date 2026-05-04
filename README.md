@@ -17,7 +17,7 @@ The whole point is to answer one question before writing any state-machine code:
 npm install
 npx wrangler login           # one-time, opens browser
 npx wrangler deploy
-curl https://ptt-autosign-worker.<your-subdomain>.workers.dev/spike | jq
+curl https://ptt-autosign.<your-subdomain>.workers.dev/spike | jq
 ```
 
 Or test against Cloudflare's edge from local without deploying:

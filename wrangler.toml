@@ -1,4 +1,4 @@
-name = "ptt-autosign-worker"
+name = "ptt-autosign"
 main = "src/index.ts"
 compatibility_date = "2026-05-01"
 
