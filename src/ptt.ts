@@ -172,12 +172,21 @@ class PttSocket {
       await this.drain();
       if (predicate(this.screen)) return true;
       if (this.closed) return false;
+      // Race-safe wait: register the waiter BEFORE re-checking the
+      // predicate. If a frame arrived in the gap between the outer
+      // predicate() call and this push, the re-check inside the executor
+      // catches it and wakes immediately. The 200ms watchdog remains as a
+      // safety net in case notify() is ever bypassed.
       await new Promise<void>((resolve) => {
-        const t = setTimeout(resolve, 200);
-        this.waiters.push(() => {
-          clearTimeout(t);
+        let woken = false;
+        const wake = () => {
+          if (woken) return;
+          woken = true;
           resolve();
-        });
+        };
+        this.waiters.push(wake);
+        if (predicate(this.screen)) wake();
+        setTimeout(wake, 200);
       });
     }
     return false;
@@ -256,11 +265,10 @@ export class PttBot {
         seen.anyKey = true;
       }
 
-      if (
-        buf.includes("我是") ||
-        buf.includes("主功能表") ||
-        buf.includes("【主功能表】")
-      ) {
+      // Use the most specific marker only. PTT writes `我是XXXXX` to the
+      // bottom status bar mid-stream during login, so a bare `我是` check
+      // can fire before the main menu finishes rendering.
+      if (buf.includes("【主功能表】")) {
         this.loggedIn = true;
         // Return the UTF-8 view since the post-login screen is UTF-8.
         return {
@@ -309,7 +317,9 @@ export class PttBot {
     // Talk menu → user query.
     this.sock.send(`Q${KEY_ENTER}`);
     const queryPromptOk = await this.sock.waitFor(
-      (b) => b.includes("請輸入使用者代號") || b.includes("代號"),
+      // Don't fall back to bare `代號` — the rolling buffer still holds the
+      // initial login prompt `請輸入代號…`, which would match instantly.
+      (b) => b.includes("請輸入使用者代號"),
       3_000,
     );
     if (!queryPromptOk) {
@@ -335,10 +345,15 @@ export class PttBot {
     return info;
   }
 
-  /** Press q a few times to drop back to main menu. Best-effort. */
+  /**
+   * Best-effort: send ArrowLeft (←) until we see the main menu marker.
+   * Avoid `q` here — on the main menu, `q` initiates a logout dialog, which
+   * would race with the explicit logout() call afterward.
+   */
   private async escapeToMain(): Promise<void> {
-    for (let i = 0; i < 3; i++) {
-      this.sock.send(`q${KEY_ENTER}`);
+    for (let i = 0; i < 4; i++) {
+      if (this.sock.screen.includes("【主功能表】")) return;
+      this.sock.send("\x1B[D"); // ANSI: cursor left = "back" in PTT menus
       await new Promise((r) => setTimeout(r, 250));
     }
   }
