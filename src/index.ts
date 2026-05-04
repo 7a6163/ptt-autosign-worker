@@ -1,7 +1,6 @@
 // Entrypoints:
 //   scheduled() — invoked by Cron Trigger; runs sign-in for every account in PTT_ACCOUNTS.
 //   GET /run?secret=<RUN_TOKEN> — manual cron-equivalent trigger for testing.
-//   GET /test-login?u=<id>&p=<pwd> — single-account login probe (dev-only).
 //   GET /spike — Phase 0 connectivity probe (no login).
 
 import { PttBot } from "./ptt";
@@ -49,15 +48,6 @@ export default {
       return json(await runSpike());
     }
 
-    if (url.pathname === "/test-login") {
-      const u = url.searchParams.get("u") ?? "";
-      const p = url.searchParams.get("p") ?? "";
-      if (!u || !p) {
-        return new Response("Missing ?u=<id>&p=<password>", { status: 400 });
-      }
-      return json(await runTestLogin(u, p));
-    }
-
     if (url.pathname === "/run") {
       const secret = url.searchParams.get("secret") ?? "";
       if (!env.RUN_TOKEN || secret !== env.RUN_TOKEN) {
@@ -67,7 +57,7 @@ export default {
     }
 
     return new Response(
-      "Routes:\n  GET /spike\n  GET /test-login?u=&p=\n  GET /run?secret=\n",
+      "Routes:\n  GET /spike\n  GET /run?secret=\n",
       { status: 404 },
     );
   },
@@ -215,29 +205,6 @@ function json(body: unknown): Response {
 }
 
 // ---------- dev probes ----------
-
-async function runTestLogin(username: string, password: string) {
-  const bot = new PttBot();
-  try {
-    await bot.connect();
-    const result = await bot.login(username, password, true);
-    if (result.ok) {
-      const info = await bot.getUser(username).catch(() => null);
-      await bot.logout();
-      return { ...result, userInfo: info };
-    }
-    return result;
-  } catch (e) {
-    return {
-      ok: false,
-      reason: `exception: ${(e as Error).message}`,
-      screen: bot.dumpScreen().slice(-2000),
-      elapsed_ms: 0,
-    };
-  } finally {
-    bot.close();
-  }
-}
 
 async function runSpike(): Promise<SpikeReport> {
   const start = Date.now();
