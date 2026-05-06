@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-06
+
+### Added
+
+- Capture and report PTT's post-login welcome-banner IP in the Telegram
+  success message (`🌐 上次登入來源 <IP>` line) and `/run` JSON
+  (`SignInResult.lastLoginIp`). Best-effort; `null` on first-time logins
+  or regex miss. The IP shown is Cloudflare's egress (e.g. `172.69.x.x`),
+  not the operator's home IP.
+
 ## [0.1.0] - 2026-05-04
 
 Initial working release. Cloudflare Workers port of
@@ -37,5 +47,6 @@ Initial working release. Cloudflare Workers port of
 - Worker name in `wrangler.toml` is `ptt-autosign`; GitHub repo is
   `ptt-autosign-worker`.
 
-[Unreleased]: https://github.com/7a6163/ptt-autosign-worker/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/7a6163/ptt-autosign-worker/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/7a6163/ptt-autosign-worker/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/7a6163/ptt-autosign-worker/releases/tag/v0.1.0

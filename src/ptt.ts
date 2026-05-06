@@ -16,9 +16,15 @@ const KEY_ENTER = "\r";
 const ANSI_RE = /\x1b\[[\??!>]?[0-9;]*[@A-Za-z`]|\x1b[\(\)][AB012]|\x07/g;
 const HTTP_NOISE_RE = /^HTTP\/1\.\d \d+ [^\r\n]*\r?\n\r?\n/;
 const ROLLING_BUFFER_LIMIT = 32 * 1024;
+// PTT post-login banner: `歡迎您再度拜訪，上次您是從 <IP> 連往本站。`
+// First-time logins print `歡迎您第一次拜訪本站` and intentionally don't match.
+// Char class covers IPv4, IPv6, and IPv4-mapped IPv6; length-bounded to avoid
+// eating CJK if PTT changes the trailing phrase.
+const LAST_LOGIN_IP_RE =
+  /歡迎您再度拜訪[，,]\s*上次您是從\s+([0-9A-Fa-f:.]{2,45})\s+連往本站/;
 
 export type LoginResult =
-  | { ok: true; screen: string; elapsed_ms: number }
+  | { ok: true; screen: string; elapsed_ms: number; lastLoginIp: string | null }
   | { ok: false; reason: string; screen: string; elapsed_ms: number };
 
 export type UserInfo = {
@@ -273,11 +279,16 @@ export class PttBot {
       // can fire before the main menu finishes rendering.
       if (buf.includes("【主功能表】")) {
         this.loggedIn = true;
+        // Drain pending Blob frames before regex so the welcome banner
+        // (printed just before 主功能表) is fully decoded into utf8View.
+        await this.sock.drain();
+        const lastLoginIp = this.extractLastLoginIp();
         // Return the UTF-8 view since the post-login screen is UTF-8.
         return {
           ok: true,
           screen: this.sock.utf8View.slice(-2000),
           elapsed_ms: Date.now() - start,
+          lastLoginIp,
         };
       }
 
@@ -346,6 +357,15 @@ export class PttBot {
 
     await this.escapeToMain();
     return info;
+  }
+
+  /**
+   * Extract the last-login IP from the post-login welcome banner. Returns
+   * null on first-time logins or when PTT changes the wording.
+   */
+  private extractLastLoginIp(): string | null {
+    const m = this.sock.utf8View.match(LAST_LOGIN_IP_RE);
+    return m ? m[1] : null;
   }
 
   /**

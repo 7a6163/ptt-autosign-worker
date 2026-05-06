@@ -28,6 +28,7 @@ type SignInResult = {
   reason?: string;
   loginCount: number | null;
   mailStatus: string | null;
+  lastLoginIp: string | null;
   elapsed_ms: number;
 };
 
@@ -127,6 +128,7 @@ async function signInOne(id: string, password: string): Promise<SignInResult> {
         reason: login.reason,
         loginCount: null,
         mailStatus: null,
+        lastLoginIp: null,
         elapsed_ms: login.elapsed_ms,
       };
     }
@@ -149,6 +151,7 @@ async function signInOne(id: string, password: string): Promise<SignInResult> {
       ok: true,
       loginCount: info.loginCount,
       mailStatus: info.mailStatus,
+      lastLoginIp: login.lastLoginIp,
       elapsed_ms: login.elapsed_ms,
     };
   } catch (e) {
@@ -158,6 +161,7 @@ async function signInOne(id: string, password: string): Promise<SignInResult> {
       reason: `exception: ${(e as Error).message}`,
       loginCount: null,
       mailStatus: null,
+      lastLoginIp: null,
       elapsed_ms: 0,
     };
   } finally {
@@ -174,6 +178,7 @@ function formatMessage(r: SignInResult): string {
     let msg = `✅ PTT ${htmlEscape(r.id)} 已成功簽到\n`;
     if (r.loginCount !== null) msg += `📆 已登入 ${r.loginCount} 天\n`;
     if (r.mailStatus) msg += `📫 ${htmlEscape(r.mailStatus)}\n`;
+    if (r.lastLoginIp) msg += `🌐 上次登入來源 ${htmlEscape(r.lastLoginIp)}\n`;
     msg += `#ptt #${date}`;
     return msg;
   }

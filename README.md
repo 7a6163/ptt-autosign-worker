@@ -2,9 +2,11 @@
 
 Cloudflare Workers port of [PTTAutoSign](https://github.com/tasi788/PTTAutoSign).
 Logs into one or more PTT accounts daily via `wss://ws.ptt.cc/bbs/`, reads
-`登入次數` + `信箱狀況`, and reports the result to Telegram.
+`登入次數` + `信箱狀況` + last-login IP, and reports the result to Telegram.
 
 No terminal emulator, no `nodejs_compat`, no runtime dependencies.
+
+Release history: see [CHANGELOG.md](CHANGELOG.md).
 
 ## How it works
 
@@ -16,7 +18,8 @@ account in `PTT_ACCOUNTS`, the Worker:
    negotiation).
 3. Walks a small login state machine — kicks duplicate sessions, dismisses
    any-key prompts, etc.
-4. Navigates `T → Q → username` to scrape `登入次數` and `信箱狀況`.
+4. Navigates `T → Q → username` to scrape `登入次數` and `信箱狀況`. Also
+   captures the post-login welcome banner's IP (Cloudflare egress).
 5. Sends `G\rY\r` to log out.
 6. Posts a Telegram message.
 
@@ -58,8 +61,12 @@ Success:
 ✅ PTT alice 已成功簽到
 📆 已登入 1234 天
 📫 信箱中已無新信件
+🌐 上次登入來源 172.69.194.125
 #ptt #20260504
 ```
+
+The `🌐` line is omitted on first-time logins (PTT prints "歡迎您第一次拜訪本站"
+with no prior IP) or when the welcome-banner regex doesn't match.
 
 Failure:
 
@@ -84,6 +91,11 @@ Failure:
   based on the classic PyPtt user-card layout. PTT may use a different
   label format; if `loginCount` and `mailStatus` come back `null` but
   login itself succeeds, the Telegram message just omits those lines.
+- **`lastLoginIp` regex** — same best-effort posture. Returns `null` on
+  first-time logins and on any wording change to the welcome banner; the
+  `🌐` line is then dropped silently. The reported IP is whatever PTT saw
+  on the inbound socket, which for Cloudflare Workers is a CF egress IP
+  (e.g. `172.69.x.x`), not the operator's home IP.
 - **Cron precision** — Cloudflare crons fire within seconds of `02:30 UTC`.
   Add jitter inside `scheduled()` if anti-detection becomes a concern.
 - **Free-plan budget** — Timeouts are tuned for a 30-second Free-plan
