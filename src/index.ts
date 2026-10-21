@@ -22,7 +22,7 @@ const CAPTURE_MS = 5000;
 // constraint; Free plan's 10 ms CPU per invocation is.
 const INTER_ACCOUNT_DELAY_MS = 1000;
 
-type SignInResult = {
+export type SignInResult = {
   id: string;
   ok: boolean;
   reason?: string;
@@ -190,7 +190,7 @@ async function signInOne(id: string, password: string): Promise<SignInResult> {
   }
 }
 
-function formatMessage(r: SignInResult): string {
+export function formatMessage(r: SignInResult): string {
   const date = new Date()
     .toISOString()
     .slice(0, 10)
@@ -206,7 +206,7 @@ function formatMessage(r: SignInResult): string {
   return `❌ PTT ${htmlEscape(r.id)} 簽到失敗\n原因：${htmlEscape(r.reason ?? "unknown")}\n#ptt #${date}`;
 }
 
-function parseAccounts(raw: string | undefined): Array<{ id: string; password: string }> {
+export function parseAccounts(raw: string | undefined): Array<{ id: string; password: string }> {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);

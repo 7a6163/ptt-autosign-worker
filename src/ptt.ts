@@ -54,7 +54,7 @@ function encodeAsciiBytes(text: string): Uint8Array {
   return out;
 }
 
-class PttSocket {
+export class PttSocket {
   private ws: WebSocket | null = null;
   private chunks: Promise<void>[] = [];
   private big5Decoder = new TextDecoder("big5", {
@@ -77,7 +77,11 @@ class PttSocket {
     if (resp.status !== 101 || !resp.webSocket) {
       throw new Error(`PTT WS handshake failed: status=${resp.status}`);
     }
-    const ws = resp.webSocket;
+    this.attach(resp.webSocket);
+  }
+
+  /** Wire up an already-open socket; split from connect() so tests can pass a WebSocketPair end. */
+  attach(ws: WebSocket): void {
     try {
       (ws as unknown as { binaryType: string }).binaryType = "arraybuffer";
     } catch {
@@ -202,7 +206,8 @@ class PttSocket {
 }
 
 export class PttBot {
-  private sock = new PttSocket();
+  constructor(private sock = new PttSocket()) {}
+
   private loggedIn = false;
 
   async connect(): Promise<void> {
@@ -285,10 +290,11 @@ export class PttBot {
         reply = KEY_ENTER;
       }
       if (reply !== null) {
-        this.sock.send(reply);
         // Clear so an answered prompt isn't answered again, while a
         // repeated one (e.g. a second 按任意鍵繼續) is still seen fresh.
+        // Clear before sending so PTT's reply can't land before the clear.
         await this.sock.clear();
+        this.sock.send(reply);
       }
 
       await new Promise((r) => setTimeout(r, 250));

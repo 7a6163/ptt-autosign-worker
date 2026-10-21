@@ -9,7 +9,9 @@ A Cloudflare Worker (no runtime dependencies, no `nodejs_compat`) that logs into
 ## Commands
 
 ```bash
-npm run typecheck   # tsc --noEmit — the only static check; there is no test suite or linter
+npm run typecheck   # tsc --noEmit (covers src/ and test/)
+npm test            # vitest inside workerd via @cloudflare/vitest-plugin
+npx vitest run test/ptt.test.ts -t "repeated any-key"   # one file / one test
 npm run dev         # wrangler dev --remote (remote: PTT must be reached from Cloudflare's network)
 npm run deploy      # wrangler deploy
 npm run tail        # stream production logs
@@ -30,6 +32,8 @@ Secrets (`wrangler secret put`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `PTT_
 - `src/telegram.ts` — `sendMessage` wrapper that throws on non-2xx.
 
 ## Gotchas when editing PTT logic
+
+- Test PTT flows with `fakePtt()` in `test/ptt.test.ts`: a `WebSocketPair` whose server end scripts PTT's replies, attached through `PttSocket.attach()` and passed into `new PttBot(sock)`. Tests send UTF-8 only; the Big5 (pre-login) path isn't covered.
 
 - **The rolling buffer keeps old screens** unless you call `sock.clear()` (which drains first). Call it before sending a key whose response you'll match on, otherwise a marker can match an earlier screen (e.g. 【主功能表】 from login). `login()` clears after answering each prompt, so grab anything you still need (the banner IP) before that. Don't treat a bare `我是` as logged in; the status bar shows it before the menu renders.
 - Don't use `q` to go back to the main menu, because on the main menu it opens the logout dialog. `escapeToMain()` sends ArrowLeft (`\x1B[D`) instead.

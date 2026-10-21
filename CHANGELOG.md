@@ -14,6 +14,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `scheduled()` throws when the run has errors, so the Cron run shows as
   failed; a malformed `PTT_ACCOUNTS` now sends a Telegram alert.
 - Telegram requests time out after 10 s.
+- Add Vitest tests (run in workerd) for the login state machine, user
+  query navigation, route auth, account parsing and message formatting.
 
 ### Fixed
 

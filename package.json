@@ -7,11 +7,14 @@
     "dev": "wrangler dev --remote",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "test": "vitest run"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.6",
     "@cloudflare/workers-types": "^4.20250115.0",
     "typescript": "^5.7.2",
+    "vitest": "^4.1.12",
     "wrangler": "^4.87.0"
   }
 }
