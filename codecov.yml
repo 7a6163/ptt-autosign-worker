@@ -1,0 +1,11 @@
+coverage:
+  status:
+    project:
+      default:
+        # Fail if overall coverage drops more than 1% below the base commit.
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        # Lines added or changed by a commit/PR must be at least 80% covered.
+        target: 80%

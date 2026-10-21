@@ -26,7 +26,7 @@ Manual verification is against the deployed Worker (both routes need `Authorizat
 
 Secrets (`wrangler secret put`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, optional `TELEGRAM_TOPIC_ID` (forum topic → `message_thread_id`), `PTT_ACCOUNTS` (JSON `[{"id":"...","password":"..."}]`), `RUN_TOKEN`. Don't put credentials in URLs. A `/test-login` route was removed for that reason (access logs).
 
-CI (`.github/workflows/ci.yml`) runs typecheck, lint, format check and tests with coverage on push to `main` and on PRs, then uploads to Codecov via OIDC (no token secret).
+CI (`.github/workflows/ci.yml`) runs typecheck, lint, format check and tests with coverage on push to `main` and on PRs, then uploads to Codecov via OIDC (no token secret). `codecov.yml` sets the status checks: overall coverage may not drop more than 1% from the base, and changed lines need 80% coverage.
 
 Releasing: bump `package.json` (`npm version X.Y.Z --no-git-tag-version`), move `[Unreleased]` in CHANGELOG to `## [X.Y.Z] - <date>` and update the compare links, commit, then push an annotated `vX.Y.Z` tag. `.github/workflows/release.yml` creates the GitHub Release from that CHANGELOG section, and fails if the section is missing. Deploying is separate (`npm run deploy`).
 
