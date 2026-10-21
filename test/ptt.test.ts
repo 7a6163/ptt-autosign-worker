@@ -8,7 +8,11 @@ function fakePtt(respond: (input: string) => void) {
   server.accept();
   server.addEventListener("message", async (e) => {
     const d = e.data as string | ArrayBuffer | Blob; // binary arrives as Blob on this end
-    respond(typeof d === "string" ? d : new TextDecoder().decode(d instanceof Blob ? await d.arrayBuffer() : d));
+    respond(
+      typeof d === "string"
+        ? d
+        : new TextDecoder().decode(d instanceof Blob ? await d.arrayBuffer() : d),
+    );
   });
   const sock = new PttSocket();
   sock.attach(client);
@@ -79,7 +83,8 @@ describe("PttBot.getUser", () => {
       if (input.startsWith("alice,")) send("【主功能表】");
       else if (input === "T\r") send("【休閒聊天】 (Q)uery 查詢網友");
       else if (input === "Q\r") send("請輸入使用者代號：");
-      else if (input === "alice\r") send("《登入次數》\x1b[1m1234\x1b[m 次  《信箱狀況》最近無新信件  ");
+      else if (input === "alice\r")
+        send("《登入次數》\x1b[1m1234\x1b[m 次  《信箱狀況》最近無新信件  ");
       else if (input === "\x1b[D") send(++lefts === 1 ? "【休閒聊天】" : "【主功能表】");
     });
     await bot.login("alice", "pw");

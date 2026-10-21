@@ -21,8 +21,7 @@ const ROLLING_BUFFER_LIMIT = 32 * 1024;
 // First-time logins print `歡迎您第一次拜訪本站` and intentionally don't match.
 // Char class covers IPv4, IPv6, and IPv4-mapped IPv6; length-bounded to avoid
 // eating CJK if PTT changes the trailing phrase.
-const LAST_LOGIN_IP_RE =
-  /歡迎您再度拜訪[，,]\s*上次您是從\s+([0-9A-Fa-f:.]{2,45})\s+連往本站/;
+const LAST_LOGIN_IP_RE = /歡迎您再度拜訪[，,]\s*上次您是從\s+([0-9A-Fa-f:.]{2,45})\s+連往本站/;
 
 export type LoginResult =
   | { ok: true; screen: string; elapsed_ms: number; lastLoginIp: string | null }
@@ -176,10 +175,7 @@ export class PttSocket {
     this.closed = true;
   }
 
-  async waitFor(
-    predicate: (buf: string) => boolean,
-    timeoutMs: number,
-  ): Promise<boolean> {
+  async waitFor(predicate: (buf: string) => boolean, timeoutMs: number): Promise<boolean> {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       await this.drain();
@@ -214,25 +210,17 @@ export class PttBot {
   async connect(): Promise<void> {
     await this.sock.connect();
     const ok = await this.sock.waitFor(
-      (buf) =>
-        buf.includes("請輸入") ||
-        buf.includes("代號") ||
-        buf.includes("guest"),
+      (buf) => buf.includes("請輸入") || buf.includes("代號") || buf.includes("guest"),
       10_000,
     );
     if (!ok) {
       throw new Error(
-        `Did not see login prompt within 10s. Screen tail: ${this.sock.screen.slice(
-          -300,
-        )}`,
+        `Did not see login prompt within 10s. Screen tail: ${this.sock.screen.slice(-300)}`,
       );
     }
   }
 
-  async login(
-    username: string,
-    password: string,
-  ): Promise<LoginResult> {
+  async login(username: string, password: string): Promise<LoginResult> {
     const start = Date.now();
     if (this.loggedIn) {
       return {
@@ -332,10 +320,7 @@ export class PttBot {
     // Talk menu → user query.
     await this.sock.clear();
     this.sock.send(`Q${KEY_ENTER}`);
-    const queryPromptOk = await this.sock.waitFor(
-      (b) => b.includes("請輸入使用者代號"),
-      2_000,
-    );
+    const queryPromptOk = await this.sock.waitFor((b) => b.includes("請輸入使用者代號"), 2_000);
     if (!queryPromptOk) {
       await this.escapeToMain();
       return empty;
@@ -396,11 +381,7 @@ export class PttBot {
   }
 }
 
-function failure(
-  reason: string,
-  screen: string,
-  startedAt: number,
-): LoginResult {
+function failure(reason: string, screen: string, startedAt: number): LoginResult {
   return {
     ok: false,
     reason,

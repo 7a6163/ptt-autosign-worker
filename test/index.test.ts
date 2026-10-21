@@ -18,9 +18,21 @@ describe("routes", () => {
   it.each([
     ["unknown path", "/x", {}, env, 404],
     ["no token", "/run", { method: "POST" }, env, 403],
-    ["wrong token", "/run", { method: "POST", headers: { authorization: "Bearer nope" } }, env, 403],
+    [
+      "wrong token",
+      "/run",
+      { method: "POST", headers: { authorization: "Bearer nope" } },
+      env,
+      403,
+    ],
     ["token in query string", "/run?secret=t0k", { method: "POST" }, env, 403],
-    ["RUN_TOKEN unset", "/run", { method: "POST", headers: { authorization: "Bearer " } }, { ...env, RUN_TOKEN: "" }, 403],
+    [
+      "RUN_TOKEN unset",
+      "/run",
+      { method: "POST", headers: { authorization: "Bearer " } },
+      { ...env, RUN_TOKEN: "" },
+      403,
+    ],
     ["GET /run", "/run", { headers: { authorization: "Bearer t0k" } }, env, 405],
   ] as const)("%s → %i", async (_name, path, init, e, status) => {
     expect((await call(path, init, e)).status).toBe(status);
@@ -29,13 +41,20 @@ describe("routes", () => {
   it("alerts Telegram when PTT_ACCOUNTS is malformed", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
 
-    const res = await call("/run", { method: "POST", headers: { authorization: "Bearer t0k" } }, {
-      ...env,
-      PTT_ACCOUNTS: "not json",
-    });
+    const res = await call(
+      "/run",
+      { method: "POST", headers: { authorization: "Bearer t0k" } },
+      {
+        ...env,
+        PTT_ACCOUNTS: "not json",
+      },
+    );
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ accounts: [], errors: ["PTT_ACCOUNTS is empty or malformed"] });
+    expect(await res.json()).toEqual({
+      accounts: [],
+      errors: ["PTT_ACCOUNTS is empty or malformed"],
+    });
     const [url, init] = fetchSpy.mock.calls[0];
     expect(url).toBe("https://api.telegram.org/botbot/sendMessage");
     const body = JSON.parse(init!.body as string);
@@ -46,11 +65,15 @@ describe("routes", () => {
   it("posts into the Telegram topic when TELEGRAM_TOPIC_ID is set", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
 
-    await call("/run", { method: "POST", headers: { authorization: "Bearer t0k" } }, {
-      ...env,
-      PTT_ACCOUNTS: "not json",
-      TELEGRAM_TOPIC_ID: "42",
-    });
+    await call(
+      "/run",
+      { method: "POST", headers: { authorization: "Bearer t0k" } },
+      {
+        ...env,
+        PTT_ACCOUNTS: "not json",
+        TELEGRAM_TOPIC_ID: "42",
+      },
+    );
 
     expect(JSON.parse(fetchSpy.mock.calls[0][1]!.body as string).message_thread_id).toBe(42);
   });
@@ -85,9 +108,9 @@ describe("formatMessage", () => {
   });
 
   it("omits lines for missing fields", () => {
-    expect(formatMessage({ ...base, loginCount: null, mailStatus: null, lastLoginIp: null })).toMatch(
-      /^✅ PTT alice 已成功簽到\n#ptt #\d{8}$/,
-    );
+    expect(
+      formatMessage({ ...base, loginCount: null, mailStatus: null, lastLoginIp: null }),
+    ).toMatch(/^✅ PTT alice 已成功簽到\n#ptt #\d{8}$/);
   });
 
   it("HTML-escapes PTT-derived text on failure", () => {

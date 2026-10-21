@@ -67,11 +67,13 @@ export default {
   },
 
   async scheduled(_ctrl: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(runDailySignIn(env).then((r) => {
-      console.log("daily sign-in summary:", JSON.stringify(r));
-      // Throw so the Cron run shows as failed in the dashboard.
-      if (r.errors.length > 0) throw new Error(r.errors.join("; "));
-    }));
+    ctx.waitUntil(
+      runDailySignIn(env).then((r) => {
+        console.log("daily sign-in summary:", JSON.stringify(r));
+        // Throw so the Cron run shows as failed in the dashboard.
+        if (r.errors.length > 0) throw new Error(r.errors.join("; "));
+      }),
+    );
   },
 } satisfies ExportedHandler<Env>;
 
@@ -198,10 +200,7 @@ async function signInOne(id: string, password: string): Promise<SignInResult> {
 }
 
 export function formatMessage(r: SignInResult): string {
-  const date = new Date()
-    .toISOString()
-    .slice(0, 10)
-    .replace(/-/g, "");
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   if (r.ok) {
     let msg = `✅ PTT ${htmlEscape(r.id)} 已成功簽到\n`;
     if (r.loginCount !== null) msg += `📆 已登入 ${r.loginCount} 天\n`;
@@ -228,10 +227,7 @@ export function parseAccounts(raw: string | undefined): Array<{ id: string; pass
 }
 
 function htmlEscape(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function json(body: unknown): Response {

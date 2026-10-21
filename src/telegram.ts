@@ -25,8 +25,6 @@ export async function sendTelegram(
   });
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
-    throw new Error(
-      `Telegram sendMessage ${resp.status}: ${body.slice(0, 300)}`,
-    );
+    throw new Error(`Telegram sendMessage ${resp.status}: ${body.slice(0, 300)}`);
   }
 }
