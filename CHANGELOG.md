@@ -12,6 +12,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Dev tooling: wrangler 4.151, TypeScript 7, Vitest 5, workers-types 5
+  (clears all `npm audit` findings; none affected the deployed Worker).
 - **Breaking:** `/run` is now `POST` and both `/run` and `/spike` require
   `Authorization: Bearer <RUN_TOKEN>` (constant-time compare). The token
   no longer travels in the URL, and link prefetch can't trigger a sign-in.
