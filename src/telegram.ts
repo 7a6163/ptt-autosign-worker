@@ -17,6 +17,8 @@ export async function sendTelegram(
       parse_mode: "HTML",
       disable_web_page_preview: true,
     }),
+    // A hung request would otherwise stall every later account in the loop.
+    signal: AbortSignal.timeout(10_000),
   });
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");

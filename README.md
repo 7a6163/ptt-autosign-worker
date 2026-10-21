@@ -44,13 +44,14 @@ npx wrangler secret put RUN_TOKEN       # any random string
 
 | Route | Purpose | Auth |
 |---|---|---|
-| `GET /spike` | Diagnostic — opens WS to ws.ptt.cc and dumps the welcome banner | none |
-| `GET /run?secret=<RUN_TOKEN>` | Manual cron-equivalent trigger | RUN_TOKEN |
+| `GET /spike` | Diagnostic — opens WS to ws.ptt.cc and dumps the welcome banner | `Authorization: Bearer <RUN_TOKEN>` |
+| `POST /run` | Manual cron-equivalent trigger | `Authorization: Bearer <RUN_TOKEN>` |
 | `scheduled()` | Daily 02:30 UTC | Cloudflare Cron Trigger |
 
 ```bash
 # Smoke test after deploy + secrets
-curl "https://ptt-autosign.<sub>.workers.dev/run?secret=<RUN_TOKEN>" | jq
+curl -X POST -H "Authorization: Bearer <RUN_TOKEN>" \
+  https://ptt-autosign.<sub>.workers.dev/run | jq
 ```
 
 ## Telegram message format
@@ -83,7 +84,7 @@ Failure:
 | `wrong_password` | PTT echoed `密碼不對或無此帳號` |
 | `server_busy` | PTT echoed `請稍後再試` |
 | `socket_closed` | WebSocket closed mid-flow |
-| `timeout` | State machine ran past 30 s without seeing the login marker — likely a PTT prompt change. Inspect the `screen` field. |
+| `timeout` | State machine ran past 15 s without seeing the login marker — likely a PTT prompt change. Inspect the `screen` field. |
 
 ## Known soft spots
 
@@ -98,11 +99,10 @@ Failure:
   (e.g. `172.69.x.x`), not the operator's home IP.
 - **Cron precision** — Cloudflare crons fire within seconds of `02:30 UTC`.
   Add jitter inside `scheduled()` if anti-detection becomes a concern.
-- **Free-plan budget** — Timeouts are tuned for a 30-second Free-plan
-  scheduled-handler wall-clock. Per account budget: ~10–17 s realistic,
-  ~22 s worst case. **Two accounts fit; 3+ accounts likely need the
-  Paid plan.** Knobs to adjust in `src/ptt.ts`: the `15_000`-ms login
-  deadline and the inner `getUser` waitFor timeouts.
+- **Free-plan budget** — Scheduled Workers get 15 min wall-clock on every
+  plan, so waiting on PTT is not the limit. The Free plan's **10 ms CPU
+  per Cron invocation** is: every poll decodes frames and scans the screen
+  buffers. Check CPU time in the Workers dashboard before adding accounts.
 
 ## File layout
 

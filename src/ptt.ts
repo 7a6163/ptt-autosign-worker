@@ -30,10 +30,9 @@ export type LoginResult =
 export type UserInfo = {
   loginCount: number | null;
   mailStatus: string | null;
-  rawScreen: string;
 };
 
-export function stripAnsi(s: string): string {
+function stripAnsi(s: string): string {
   return s.replace(ANSI_RE, "").replace(HTTP_NOISE_RE, "");
 }
 
@@ -136,6 +135,13 @@ class PttSocket {
     }
   }
 
+  /** Forget everything received so far, so stale prompts can't match. */
+  async clear(): Promise<void> {
+    await this.drain();
+    this.big5Buffer = "";
+    this.utf8Buffer = "";
+  }
+
   send(text: string): void {
     if (!this.ws) throw new Error("socket not connected");
     this.ws.send(encodeAsciiBytes(text));
@@ -146,10 +152,6 @@ class PttSocket {
     return this.big5Buffer + "\n" + this.utf8Buffer;
   }
 
-  get big5View(): string {
-    return this.big5Buffer;
-  }
-
   get utf8View(): string {
     return this.utf8Buffer;
   }
@@ -158,10 +160,10 @@ class PttSocket {
     return this.closed;
   }
 
-  close(code = 1000, reason = "done"): void {
+  close(): void {
     if (this.ws && !this.closed) {
       try {
-        this.ws.close(code, reason);
+        this.ws.close(1000, "done");
       } catch {
         /* noop */
       }
@@ -224,7 +226,6 @@ export class PttBot {
   async login(
     username: string,
     password: string,
-    kick = true,
   ): Promise<LoginResult> {
     const start = Date.now();
     if (this.loggedIn) {
@@ -238,14 +239,15 @@ export class PttBot {
     // Trailing comma triggers PTT's UTF-8 mode for post-login output.
     this.sock.send(`${username},${KEY_ENTER}${password}${KEY_ENTER}`);
 
-    const seen = { kick: false, tooOften: false, cleanup: false, anyKey: false };
-    // 15s budget keeps the per-account worst-case under the Cloudflare Free
-    // plan's 30s scheduled-handler wall-clock. PTT login normally completes
-    // in 2–7s; padding above that is just dead clock.
+    let lastLoginIp: string | null = null;
+    // PTT login normally completes in 2–7s; padding above that is dead clock.
     const deadline = Date.now() + 15_000;
 
     while (Date.now() < deadline) {
+      await this.sock.drain();
       const buf = this.sock.screen;
+      // Grab the welcome-banner IP before a clear() below discards it.
+      lastLoginIp ??= this.extractLastLoginIp();
 
       if (buf.includes("密碼不對或無此帳號")) {
         return failure("wrong_password", buf, start);
@@ -254,35 +256,11 @@ export class PttBot {
         return failure("server_busy", buf, start);
       }
 
-      if (!seen.kick && buf.includes("您想刪除其他重複登入的連線嗎")) {
-        this.sock.send(`${kick ? "y" : "n"}${KEY_ENTER}`);
-        seen.kick = true;
-      } else if (
-        !seen.tooOften &&
-        buf.includes("請勿頻繁登入以免造成系統過度負荷")
-      ) {
-        this.sock.send(KEY_ENTER);
-        seen.tooOften = true;
-      } else if (
-        !seen.cleanup &&
-        buf.includes("您要刪除以上錯誤嘗試的記錄嗎")
-      ) {
-        this.sock.send(`y${KEY_ENTER}`);
-        seen.cleanup = true;
-      } else if (!seen.anyKey && buf.includes("按任意鍵繼續")) {
-        this.sock.send(KEY_ENTER);
-        seen.anyKey = true;
-      }
-
       // Use the most specific marker only. PTT writes `我是XXXXX` to the
       // bottom status bar mid-stream during login, so a bare `我是` check
       // can fire before the main menu finishes rendering.
       if (buf.includes("【主功能表】")) {
         this.loggedIn = true;
-        // Drain pending Blob frames before regex so the welcome banner
-        // (printed just before 主功能表) is fully decoded into utf8View.
-        await this.sock.drain();
-        const lastLoginIp = this.extractLastLoginIp();
         // Return the UTF-8 view since the post-login screen is UTF-8.
         return {
           ok: true,
@@ -292,19 +270,30 @@ export class PttBot {
         };
       }
 
-      await new Promise((r) => setTimeout(r, 250));
       if (this.sock.isClosed()) {
         return failure("socket_closed", buf, start);
       }
+
+      let reply: string | null = null;
+      if (buf.includes("您想刪除其他重複登入的連線嗎")) {
+        reply = `y${KEY_ENTER}`; // kick the other session
+      } else if (buf.includes("請勿頻繁登入以免造成系統過度負荷")) {
+        reply = KEY_ENTER;
+      } else if (buf.includes("您要刪除以上錯誤嘗試的記錄嗎")) {
+        reply = `y${KEY_ENTER}`;
+      } else if (buf.includes("按任意鍵繼續")) {
+        reply = KEY_ENTER;
+      }
+      if (reply !== null) {
+        this.sock.send(reply);
+        // Clear so an answered prompt isn't answered again, while a
+        // repeated one (e.g. a second 按任意鍵繼續) is still seen fresh.
+        await this.sock.clear();
+      }
+
+      await new Promise((r) => setTimeout(r, 250));
     }
     return failure("timeout", this.sock.screen, start);
-  }
-
-  /** Returns both Big5 and UTF-8 decoded views, separated by a marker. */
-  dumpScreen(): string {
-    return (
-      "[BIG5]\n" + this.sock.big5View + "\n[UTF-8]\n" + this.sock.utf8View
-    );
   }
 
   /**
@@ -316,23 +305,27 @@ export class PttBot {
     const empty: UserInfo = {
       loginCount: null,
       mailStatus: null,
-      rawScreen: "",
     };
     if (!this.loggedIn) return empty;
 
+    // Each step clears first so markers only match the newly drawn screen
+    // (the main menu also shows `休閒聊天`, the login prompt `代號`, …).
     // Navigate: main menu → talk menu.
+    await this.sock.clear();
     this.sock.send(`T${KEY_ENTER}`);
     const talkOk = await this.sock.waitFor(
       (b) => b.includes("查詢網友") || b.includes("(Q)") || b.includes("休閒聊天"),
       2_000,
     );
-    if (!talkOk) return empty;
+    if (!talkOk) {
+      await this.escapeToMain();
+      return empty;
+    }
 
     // Talk menu → user query.
+    await this.sock.clear();
     this.sock.send(`Q${KEY_ENTER}`);
     const queryPromptOk = await this.sock.waitFor(
-      // Don't fall back to bare `代號` — the rolling buffer still holds the
-      // initial login prompt `請輸入代號…`, which would match instantly.
       (b) => b.includes("請輸入使用者代號"),
       2_000,
     );
@@ -342,8 +335,10 @@ export class PttBot {
     }
 
     // Submit target id and let the info screen render.
+    await this.sock.clear();
     this.sock.send(`${targetId}${KEY_ENTER}`);
     await new Promise((r) => setTimeout(r, 800));
+    await this.sock.drain();
 
     const buf = this.sock.utf8View;
     const loginMatch = buf.match(/登入次數》\s*(\d+)/);
@@ -352,7 +347,6 @@ export class PttBot {
     const info: UserInfo = {
       loginCount: loginMatch ? parseInt(loginMatch[1], 10) : null,
       mailStatus: mailMatch ? mailMatch[1].trim() : null,
-      rawScreen: buf.slice(-1500),
     };
 
     await this.escapeToMain();
@@ -374,10 +368,11 @@ export class PttBot {
    * would race with the explicit logout() call afterward.
    */
   private async escapeToMain(): Promise<void> {
+    // Clear first: the login screen already left 【主功能表】 in the buffer.
+    await this.sock.clear();
     for (let i = 0; i < 4; i++) {
-      if (this.sock.screen.includes("【主功能表】")) return;
       this.sock.send("\x1B[D"); // ANSI: cursor left = "back" in PTT menus
-      await new Promise((r) => setTimeout(r, 250));
+      if (await this.sock.waitFor((b) => b.includes("【主功能表】"), 500)) return;
     }
   }
 

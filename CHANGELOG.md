@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `/run` is now `POST` and both `/run` and `/spike` require
+  `Authorization: Bearer <RUN_TOKEN>` (constant-time compare). The token
+  no longer travels in the URL, and link prefetch can't trigger a sign-in.
+- Failed logins include the PTT `screen` tail in `/run` JSON.
+- `scheduled()` throws when the run has errors, so the Cron run shows as
+  failed; a malformed `PTT_ACCOUNTS` now sends a Telegram alert.
+- Telegram requests time out after 10 s.
+
+### Fixed
+
+- `escapeToMain()` returned at once because 【主功能表】 from login was
+  still in the buffer, so logout keys went to the wrong screen. Navigation
+  now clears the buffer before each step.
+- Login answered each prompt only once; a repeated `按任意鍵繼續` stalled
+  until timeout.
+- A wrong password followed by a disconnect was reported as `socket_closed`.
+- Timing comments assumed a 30 s wall-clock; the real Free-plan limit is CPU.
+
 ## [0.2.0] - 2026-05-06
 
 ### Added

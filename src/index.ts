@@ -1,7 +1,8 @@
 // Entrypoints:
 //   scheduled() — invoked by Cron Trigger; runs sign-in for every account in PTT_ACCOUNTS.
-//   GET /run?secret=<RUN_TOKEN> — manual cron-equivalent trigger for testing.
+//   POST /run — manual cron-equivalent trigger for testing.
 //   GET /spike — Phase 0 connectivity probe (no login).
+// Both routes require `Authorization: Bearer <RUN_TOKEN>`.
 
 import { PttBot } from "./ptt";
 import type { UserInfo } from "./ptt";
@@ -17,15 +18,15 @@ export interface Env {
 const PTT_WS_URL = "https://ws.ptt.cc/bbs/";
 const PTT_ORIGIN = "https://term.ptt.cc";
 const CAPTURE_MS = 5000;
-// Tuned for Cloudflare Workers Free plan: a single scheduled() invocation
-// has ~30s wall-clock. Per account: ~10–17s realistic, ~22s worst case.
-// Two accounts fit (10+1+10 ≈ 21s); 3+ accounts may need Paid plan.
+// scheduled() gets 15 min wall-clock on every plan, so waits are not the
+// constraint; Free plan's 10 ms CPU per invocation is.
 const INTER_ACCOUNT_DELAY_MS = 1000;
 
 type SignInResult = {
   id: string;
   ok: boolean;
   reason?: string;
+  screen?: string; // tail of the PTT screen on login failure, for debugging
   loginCount: number | null;
   mailStatus: string | null;
   lastLoginIp: string | null;
@@ -48,30 +49,43 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
 
+    if (url.pathname !== "/spike" && url.pathname !== "/run") {
+      return new Response("not found", { status: 404 });
+    }
+    if (!(await authorized(req, env))) {
+      return new Response("forbidden", { status: 403 });
+    }
     if (url.pathname === "/spike") {
       return json(await runSpike());
     }
-
-    if (url.pathname === "/run") {
-      const secret = url.searchParams.get("secret") ?? "";
-      if (!env.RUN_TOKEN || secret !== env.RUN_TOKEN) {
-        return new Response("forbidden", { status: 403 });
-      }
-      return json(await runDailySignIn(env));
+    // POST only: a GET with side effects fires on link prefetch.
+    if (req.method !== "POST") {
+      return new Response("method not allowed", { status: 405, headers: { allow: "POST" } });
     }
-
-    return new Response(
-      "Routes:\n  GET /spike\n  GET /run?secret=\n",
-      { status: 404 },
-    );
+    return json(await runDailySignIn(env));
   },
 
   async scheduled(_ctrl: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(runDailySignIn(env).then((r) => {
       console.log("daily sign-in summary:", JSON.stringify(r));
+      // Throw so the Cron run shows as failed in the dashboard.
+      if (r.errors.length > 0) throw new Error(r.errors.join("; "));
     }));
   },
 } satisfies ExportedHandler<Env>;
+
+// Hash both sides so timingSafeEqual gets equal lengths and the token's
+// length doesn't leak through timing.
+async function authorized(req: Request, env: Env): Promise<boolean> {
+  if (!env.RUN_TOKEN) return false;
+  const enc = new TextEncoder();
+  const [got, want] = await Promise.all(
+    [req.headers.get("authorization") ?? "", `Bearer ${env.RUN_TOKEN}`].map((s) =>
+      crypto.subtle.digest("SHA-256", enc.encode(s)),
+    ),
+  );
+  return crypto.subtle.timingSafeEqual(got, want);
+}
 
 // ---------- daily sign-in ----------
 
@@ -84,7 +98,13 @@ async function runDailySignIn(env: Env): Promise<{
   const results: SignInResult[] = [];
 
   if (accounts.length === 0) {
-    errors.push("PTT_ACCOUNTS is empty or malformed");
+    const msg = "PTT_ACCOUNTS is empty or malformed";
+    errors.push(msg);
+    try {
+      await sendTelegram(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID, `❌ PTT 簽到未執行\n原因：${msg}`);
+    } catch (e) {
+      errors.push(`telegram send failed: ${(e as Error).message}`);
+    }
     return { accounts: [], errors };
   }
 
@@ -120,12 +140,13 @@ async function signInOne(id: string, password: string): Promise<SignInResult> {
   const bot = new PttBot();
   try {
     await bot.connect();
-    const login = await bot.login(id, password, true);
+    const login = await bot.login(id, password);
     if (!login.ok) {
       return {
         id,
         ok: false,
         reason: login.reason,
+        screen: login.screen,
         loginCount: null,
         mailStatus: null,
         lastLoginIp: null,
@@ -133,7 +154,7 @@ async function signInOne(id: string, password: string): Promise<SignInResult> {
       };
     }
 
-    let info: UserInfo = { loginCount: null, mailStatus: null, rawScreen: "" };
+    let info: UserInfo = { loginCount: null, mailStatus: null };
     try {
       info = await bot.getUser(id);
     } catch (e) {
