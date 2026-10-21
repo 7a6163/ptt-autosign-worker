@@ -8,12 +8,17 @@
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "tail": "wrangler tail",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "oxlint --deny-warnings",
+    "format": "oxfmt src test vitest.config.ts",
+    "format:check": "oxfmt --check src test vitest.config.ts"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.4.6",
     "@cloudflare/workers-types": "^5.20261021.1",
     "@vitest/coverage-istanbul": "^5.0.5",
+    "oxfmt": "^0.74.0",
+    "oxlint": "^1.89.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5",
     "wrangler": "^4.151.3"

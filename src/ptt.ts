@@ -13,7 +13,8 @@ const PTT_WS_URL = "https://ws.ptt.cc/bbs/";
 const PTT_ORIGIN = "https://term.ptt.cc";
 
 const KEY_ENTER = "\r";
-const ANSI_RE = /\x1b\[[\??!>]?[0-9;]*[@A-Za-z`]|\x1b[\(\)][AB012]|\x07/g;
+// oxlint-disable-next-line no-control-regex -- matching ESC/BEL is the point
+const ANSI_RE = /\x1b\[[?!>]?[0-9;]*[@A-Za-z`]|\x1b[()][AB012]|\x07/g;
 const HTTP_NOISE_RE = /^HTTP\/1\.\d \d+ [^\r\n]*\r?\n\r?\n/;
 const ROLLING_BUFFER_LIMIT = 32 * 1024;
 // PTT post-login banner: `歡迎您再度拜訪，上次您是從 <IP> 連往本站。`

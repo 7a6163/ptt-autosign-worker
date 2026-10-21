@@ -10,6 +10,8 @@ A Cloudflare Worker (no runtime dependencies, no `nodejs_compat`) that logs into
 
 ```bash
 npm run typecheck   # tsc --noEmit (covers src/ and test/)
+npm run lint        # oxlint, warnings fail
+npm run format      # oxfmt (defaults, width 100); CI runs format:check
 npm test            # vitest inside workerd via @cloudflare/vitest-plugin
 npm test -- --coverage   # istanbul → coverage/lcov.info (what CI uploads to Codecov)
 npx vitest run test/ptt.test.ts -t "repeated any-key"   # one file / one test
@@ -24,7 +26,7 @@ Manual verification is against the deployed Worker (both routes need `Authorizat
 
 Secrets (`wrangler secret put`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, optional `TELEGRAM_TOPIC_ID` (forum topic → `message_thread_id`), `PTT_ACCOUNTS` (JSON `[{"id":"...","password":"..."}]`), `RUN_TOKEN`. Don't put credentials in URLs. A `/test-login` route was removed for that reason (access logs).
 
-CI (`.github/workflows/ci.yml`) runs typecheck + tests with coverage on push to `main` and on PRs, then uploads to Codecov via OIDC (no token secret).
+CI (`.github/workflows/ci.yml`) runs typecheck, lint, format check and tests with coverage on push to `main` and on PRs, then uploads to Codecov via OIDC (no token secret).
 
 ## Architecture
 
