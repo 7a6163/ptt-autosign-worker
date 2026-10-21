@@ -7,12 +7,15 @@ export async function sendTelegram(
   token: string,
   chatId: string,
   text: string,
+  topicId?: string,
 ): Promise<void> {
   const resp = await fetch(`${API_BASE}/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       chat_id: chatId,
+      // Forum topic in a supergroup; omitted → the chat's General topic.
+      ...(topicId ? { message_thread_id: Number(topicId) } : {}),
       text,
       parse_mode: "HTML",
       disable_web_page_preview: true,

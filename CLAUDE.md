@@ -21,7 +21,7 @@ Manual verification is against the deployed Worker (both routes need `Authorizat
 - `GET /spike` — opens a WebSocket to PTT and dumps the Big5-decoded welcome banner, no login. Use it to check connectivity.
 - `POST /run` — runs the same flow as the cron and returns per-account JSON (`ok`, `reason`, `loginCount`, `mailStatus`, `lastLoginIp`, `elapsed_ms`, and `screen` on login failure). It also sends real Telegram messages and logs in to real accounts.
 
-Secrets (`wrangler secret put`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `PTT_ACCOUNTS` (JSON `[{"id":"...","password":"..."}]`), `RUN_TOKEN`. Don't put credentials in URLs. A `/test-login` route was removed for that reason (access logs).
+Secrets (`wrangler secret put`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, optional `TELEGRAM_TOPIC_ID` (forum topic → `message_thread_id`), `PTT_ACCOUNTS` (JSON `[{"id":"...","password":"..."}]`), `RUN_TOKEN`. Don't put credentials in URLs. A `/test-login` route was removed for that reason (access logs).
 
 ## Architecture
 

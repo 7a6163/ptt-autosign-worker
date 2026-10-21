@@ -38,7 +38,21 @@ describe("routes", () => {
     expect(await res.json()).toEqual({ accounts: [], errors: ["PTT_ACCOUNTS is empty or malformed"] });
     const [url, init] = fetchSpy.mock.calls[0];
     expect(url).toBe("https://api.telegram.org/botbot/sendMessage");
-    expect(JSON.parse(init!.body as string).text).toContain("簽到未執行");
+    const body = JSON.parse(init!.body as string);
+    expect(body.text).toContain("簽到未執行");
+    expect(body).not.toHaveProperty("message_thread_id");
+  });
+
+  it("posts into the Telegram topic when TELEGRAM_TOPIC_ID is set", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
+
+    await call("/run", { method: "POST", headers: { authorization: "Bearer t0k" } }, {
+      ...env,
+      PTT_ACCOUNTS: "not json",
+      TELEGRAM_TOPIC_ID: "42",
+    });
+
+    expect(JSON.parse(fetchSpy.mock.calls[0][1]!.body as string).message_thread_id).toBe(42);
   });
 });
 

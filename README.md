@@ -36,6 +36,7 @@ npx wrangler deploy
 
 npx wrangler secret put TELEGRAM_BOT_TOKEN
 npx wrangler secret put TELEGRAM_CHAT_ID
+npx wrangler secret put TELEGRAM_TOPIC_ID   # optional: forum topic id
 npx wrangler secret put PTT_ACCOUNTS    # JSON: [{"id":"alice","password":"..."}]
 npx wrangler secret put RUN_TOKEN       # any random string
 ```

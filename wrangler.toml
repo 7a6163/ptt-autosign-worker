@@ -10,5 +10,6 @@ crons = ["30 2 * * *"]
 # Required secrets — set via:
 #   wrangler secret put TELEGRAM_BOT_TOKEN
 #   wrangler secret put TELEGRAM_CHAT_ID
+#   wrangler secret put TELEGRAM_TOPIC_ID   # optional: forum topic (message_thread_id)
 #   wrangler secret put PTT_ACCOUNTS    # JSON: [{"id":"alice","password":"..."}]
 #   wrangler secret put RUN_TOKEN       # Bearer token for /run and /spike

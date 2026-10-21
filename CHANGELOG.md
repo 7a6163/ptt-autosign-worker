@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Optional `TELEGRAM_TOPIC_ID` secret posts messages into a forum topic
+  (`message_thread_id`) of a supergroup.
+
 ### Changed
 
 - **Breaking:** `/run` is now `POST` and both `/run` and `/spike` require

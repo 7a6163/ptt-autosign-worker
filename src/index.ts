@@ -11,6 +11,7 @@ import { sendTelegram } from "./telegram";
 export interface Env {
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_CHAT_ID: string;
+  TELEGRAM_TOPIC_ID?: string; // optional forum topic (message_thread_id)
   PTT_ACCOUNTS: string; // JSON: [{"id":"alice","password":"..."}, ...]
   RUN_TOKEN: string; // gate for /run
 }
@@ -101,7 +102,12 @@ async function runDailySignIn(env: Env): Promise<{
     const msg = "PTT_ACCOUNTS is empty or malformed";
     errors.push(msg);
     try {
-      await sendTelegram(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID, `❌ PTT 簽到未執行\n原因：${msg}`);
+      await sendTelegram(
+        env.TELEGRAM_BOT_TOKEN,
+        env.TELEGRAM_CHAT_ID,
+        `❌ PTT 簽到未執行\n原因：${msg}`,
+        env.TELEGRAM_TOPIC_ID,
+      );
     } catch (e) {
       errors.push(`telegram send failed: ${(e as Error).message}`);
     }
@@ -121,6 +127,7 @@ async function runDailySignIn(env: Env): Promise<{
         env.TELEGRAM_BOT_TOKEN,
         env.TELEGRAM_CHAT_ID,
         formatMessage(result),
+        env.TELEGRAM_TOPIC_ID,
       );
     } catch (e) {
       const msg = `telegram send failed for ${acc.id}: ${(e as Error).message}`;
