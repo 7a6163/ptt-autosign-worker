@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Release workflow: pushing a `v*` tag creates a GitHub Release with that
+  version's CHANGELOG section (`softprops/action-gh-release@v3`).
+
 ## [0.3.0] - 2026-10-21
 
 ### Added

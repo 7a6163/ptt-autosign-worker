@@ -28,6 +28,8 @@ Secrets (`wrangler secret put`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, optio
 
 CI (`.github/workflows/ci.yml`) runs typecheck, lint, format check and tests with coverage on push to `main` and on PRs, then uploads to Codecov via OIDC (no token secret).
 
+Releasing: bump `package.json` (`npm version X.Y.Z --no-git-tag-version`), move `[Unreleased]` in CHANGELOG to `## [X.Y.Z] - <date>` and update the compare links, commit, then push an annotated `vX.Y.Z` tag. `.github/workflows/release.yml` creates the GitHub Release from that CHANGELOG section, and fails if the section is missing. Deploying is separate (`npm run deploy`).
+
 ## Architecture
 
 - `src/index.ts` — routes, `scheduled()` (cron `30 2 * * *` in `wrangler.toml`), the sequential multi-account loop, and Telegram message formatting (HTML parse mode, so user-derived strings go through `htmlEscape`). A failure for one account, including a Telegram send error, is recorded and the loop continues to the next account.
