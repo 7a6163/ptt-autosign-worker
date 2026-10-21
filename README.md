@@ -1,5 +1,8 @@
 # ptt-autosign-worker
 
+[![CI](https://github.com/7a6163/ptt-autosign-worker/actions/workflows/ci.yml/badge.svg)](https://github.com/7a6163/ptt-autosign-worker/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/7a6163/ptt-autosign-worker/graph/badge.svg)](https://codecov.io/gh/7a6163/ptt-autosign-worker)
+
 Cloudflare Workers port of [PTTAutoSign](https://github.com/tasi788/PTTAutoSign).
 Logs into one or more PTT accounts daily via `wss://ws.ptt.cc/bbs/`, reads
 `登入次數` + `信箱狀況` + last-login IP, and reports the result to Telegram.

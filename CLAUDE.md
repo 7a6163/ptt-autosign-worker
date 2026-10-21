@@ -11,6 +11,7 @@ A Cloudflare Worker (no runtime dependencies, no `nodejs_compat`) that logs into
 ```bash
 npm run typecheck   # tsc --noEmit (covers src/ and test/)
 npm test            # vitest inside workerd via @cloudflare/vitest-plugin
+npm test -- --coverage   # istanbul → coverage/lcov.info (what CI uploads to Codecov)
 npx vitest run test/ptt.test.ts -t "repeated any-key"   # one file / one test
 npm run dev         # wrangler dev --remote (remote: PTT must be reached from Cloudflare's network)
 npm run deploy      # wrangler deploy
@@ -22,6 +23,8 @@ Manual verification is against the deployed Worker (both routes need `Authorizat
 - `POST /run` — runs the same flow as the cron and returns per-account JSON (`ok`, `reason`, `loginCount`, `mailStatus`, `lastLoginIp`, `elapsed_ms`, and `screen` on login failure). It also sends real Telegram messages and logs in to real accounts.
 
 Secrets (`wrangler secret put`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, optional `TELEGRAM_TOPIC_ID` (forum topic → `message_thread_id`), `PTT_ACCOUNTS` (JSON `[{"id":"...","password":"..."}]`), `RUN_TOKEN`. Don't put credentials in URLs. A `/test-login` route was removed for that reason (access logs).
+
+CI (`.github/workflows/ci.yml`) runs typecheck + tests with coverage on push to `main` and on PRs, then uploads to Codecov via OIDC (no token secret).
 
 ## Architecture
 

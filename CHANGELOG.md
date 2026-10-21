@@ -9,6 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Optional `TELEGRAM_TOPIC_ID` secret posts messages into a forum topic
   (`message_thread_id`) of a supergroup.
+- GitHub Actions CI (typecheck + tests) with Codecov coverage upload.
 
 ### Changed
 
