@@ -4,7 +4,7 @@
 //   GET /spike — Phase 0 connectivity probe (no login).
 // Both routes require `Authorization: Bearer <RUN_TOKEN>`.
 
-import { PttBot } from "./ptt";
+import { PTT_ORIGIN, PTT_WS_URL, PttBot } from "./ptt";
 import type { UserInfo } from "./ptt";
 import { sendTelegram } from "./telegram";
 
@@ -16,8 +16,6 @@ export interface Env {
   RUN_TOKEN: string; // gate for /run
 }
 
-const PTT_WS_URL = "https://ws.ptt.cc/bbs/";
-const PTT_ORIGIN = "https://term.ptt.cc";
 const CAPTURE_MS = 5000;
 // scheduled() gets 15 min wall-clock on every plan, so waits are not the
 // constraint; Free plan's 10 ms CPU per invocation is.

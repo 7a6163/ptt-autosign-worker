@@ -11,6 +11,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   version's CHANGELOG section (`softprops/action-gh-release@v3`).
 - `codecov.yml` coverage gates: project may not drop >1%, patch ≥ 80%.
 
+### Fixed
+
+- PTT's WebSocket gateway now returns 404 for `/bbs/`; connect to
+  `wss://ws.ptt.cc/bbs` (no trailing slash) like term.ptt.cc does. Every
+  sign-in was failing at the handshake.
+
 ## [0.3.0] - 2026-10-21
 
 ### Added

@@ -9,8 +9,9 @@
 // decode approach in kevinptt0323/ptt-client/src/sites/ptt/bot.ts:94-101 and
 // removes a class of timing bugs around the charset switch.
 
-const PTT_WS_URL = "https://ws.ptt.cc/bbs/";
-const PTT_ORIGIN = "https://term.ptt.cc";
+// No trailing slash: `/bbs/` started returning 404 (2026-11); matches term.ptt.cc.
+export const PTT_WS_URL = "https://ws.ptt.cc/bbs";
+export const PTT_ORIGIN = "https://term.ptt.cc";
 
 const KEY_ENTER = "\r";
 // oxlint-disable-next-line no-control-regex -- matching ESC/BEL is the point

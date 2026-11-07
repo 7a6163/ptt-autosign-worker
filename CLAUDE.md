@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A Cloudflare Worker (no runtime dependencies, no `nodejs_compat`) that logs into PTT accounts daily over `wss://ws.ptt.cc/bbs/`, scrapes login count / mail status / last-login IP, logs out, and reports each account to Telegram. Port of the Python [PTTAutoSign](https://github.com/tasi788/PTTAutoSign). Worker name is `ptt-autosign`; repo name is `ptt-autosign-worker`.
+A Cloudflare Worker (no runtime dependencies, no `nodejs_compat`) that logs into PTT accounts daily over `wss://ws.ptt.cc/bbs` (no trailing slash; `/bbs/` returns 404), scrapes login count / mail status / last-login IP, logs out, and reports each account to Telegram. Port of the Python [PTTAutoSign](https://github.com/tasi788/PTTAutoSign). Worker name is `ptt-autosign`; repo name is `ptt-autosign-worker`.
 
 ## Commands
 
