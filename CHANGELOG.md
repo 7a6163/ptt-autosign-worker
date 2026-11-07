@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-07
+
 ### Added
 
 - Release workflow: pushing a `v*` tag creates a GitHub Release with that
@@ -92,7 +94,8 @@ Initial working release. Cloudflare Workers port of
 - Worker name in `wrangler.toml` is `ptt-autosign`; GitHub repo is
   `ptt-autosign-worker`.
 
-[Unreleased]: https://github.com/7a6163/ptt-autosign-worker/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/7a6163/ptt-autosign-worker/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/7a6163/ptt-autosign-worker/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/7a6163/ptt-autosign-worker/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/7a6163/ptt-autosign-worker/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/7a6163/ptt-autosign-worker/releases/tag/v0.1.0
